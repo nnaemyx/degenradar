@@ -1,5 +1,5 @@
 import { Queue, QueueOptions } from "bullmq";
-import { redis } from "./index";
+import { redis } from "./client";
 import type {
   TokenDiscoveryJob,
   TradeProcessingJob,
