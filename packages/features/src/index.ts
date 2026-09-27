@@ -100,26 +100,40 @@ export function evaluateRiskFlags(params: {
 
   const hasMint = Boolean(params.mintAuthority);
   const hasFreeze = Boolean(params.freezeAuthority);
-  const highConcentration = params.top10Concentration > 40;
-  const creatorRisk = params.creatorPct > 15;
-  const lowLiquidity = params.liquidityUsd < 5000;
   const notTradeable = !params.isSellable;
+  const highConcentration = params.top10Concentration > 35;
+  const creatorRisk = params.creatorPct > 15;
+  const lowLiquidity = params.liquidityUsd < 500; // Early calls allowed down to $500 liquidity
 
-  if (hasMint) riskScore += 25;
-  if (hasFreeze) riskScore += 30;
-  if (highConcentration) riskScore += 20;
-  if (creatorRisk) riskScore += 15;
-  if (lowLiquidity) riskScore += 20;
-  if (notTradeable) riskScore += 50;
+  // Instant Critical Disqualifiers (Instant Rug / Scam check)
+  if (hasMint || hasFreeze || notTradeable) {
+    return {
+      overallRisk: 100, // Automatic maximum risk - BLOCKED
+      flags: {
+        mintAuthority: hasMint,
+        freezeAuthority: hasFreeze,
+        highHolderConcentration: highConcentration,
+        creatorSelling: creatorRisk,
+        suspiciousClusters: highConcentration,
+        lowLiquidity,
+        notTradeable,
+      },
+    };
+  }
+
+  // Distribution & Liquidity Penalties for mechanically safe coins
+  if (highConcentration) riskScore += 35;
+  if (creatorRisk) riskScore += 20;
+  if (lowLiquidity) riskScore += 25;
 
   const flags: RiskFlags = {
-    mintAuthority: hasMint,
-    freezeAuthority: hasFreeze,
+    mintAuthority: false,
+    freezeAuthority: false,
     highHolderConcentration: highConcentration,
-    creatorSelling: false,
+    creatorSelling: creatorRisk,
     suspiciousClusters: highConcentration,
     lowLiquidity,
-    notTradeable,
+    notTradeable: false,
   };
 
   return {

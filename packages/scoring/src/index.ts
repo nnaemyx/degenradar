@@ -73,10 +73,10 @@ export function calculateRulesV1Score(inputs: ScoringInputs): ScoringResult {
   const smartMoneyComponent = (smartMoneyScore / 100) * 20;
 
   // 5. Liquidity Score (max 10)
-  // Penalize < $5k, optimal between $20k - $200k for early gem discovery
+  // Scaled for early gem discovery (healthy between $500 - $25k)
   let liquidityScore = 0;
-  if (liquidityUsd >= 5000) {
-    liquidityScore = Math.min(100, (liquidityUsd / 50000) * 100);
+  if (liquidityUsd >= 500) {
+    liquidityScore = Math.min(100, (liquidityUsd / 10000) * 100);
   }
   const liquidityComponent = (liquidityScore / 100) * 10;
 

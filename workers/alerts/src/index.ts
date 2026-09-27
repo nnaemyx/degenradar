@@ -50,25 +50,32 @@ export const alertWorker = new Worker<AlertProcessingJob>(
     const mc = snapshot?.marketCap ? `$${Number(snapshot.marketCap).toLocaleString()}` : "N/A";
     const liq = snapshot?.liquidityUsd ? `$${Number(snapshot.liquidityUsd).toLocaleString()}` : "N/A";
 
-    // Formatted Telegram Alert message with explanatory reasoning
-    const message = `🚨 <b>DEGENRADAR SIGNAL ALERT</b>
+    const mintRevoked = !token.mintAuthority ? "✅ Revoked" : "❌ Active (DANGEROUS)";
+    const freezeRevoked = !token.freezeAuthority ? "✅ Revoked" : "❌ Active (DANGEROUS)";
 
-<b>Token:</b> $${token.symbol || "UNKNOWN"} (${token.name || "Token"})
+    // Formatted Telegram Alert message with explanatory reasoning & instant mobile links
+    const message = `🚨 <b>DEGENRADAR EARLY SIGNAL</b>
+
+<b>Token:</b> <b>$${token.symbol || "UNKNOWN"}</b> (${token.name || "Token"})
 <b>Mint:</b> <code>${token.mintAddress}</code>
 
-📊 <b>Metrics:</b>
-• Price: <b>${price}</b>
-• MC: <b>${mc}</b>
+🛡️ <b>Safety Verification:</b>
+• Mint Authority: <b>${mintRevoked}</b>
+• Freeze Authority: <b>${freezeRevoked}</b>
+• Risk Score: <b>${riskScore}/100</b> (${riskScore <= 30 ? "🟢 LOW RISK" : "🟡 MODERATE"})
+
+📊 <b>Micro-Cap Metrics:</b>
+• Market Cap: <b>${mc}</b>
 • Liquidity: <b>${liq}</b>
+• Price: <b>${price}</b>
 
-🎯 <b>DegenRadar Scores:</b>
-• Opportunity Score: <b>${opportunityScore}/100</b>
-• Risk Score: <b>${riskScore}/100</b>
+🎯 <b>Opportunity Score:</b> <b>${opportunityScore}/100</b>
 
-🔥 <b>Detected Drivers:</b>
+🔥 <b>Detected Catalysts:</b>
 ${signals.map((s) => `• ${s}`).join("\n")}
 
-🔗 <a href="https://solscan.io/token/${token.mintAddress}">View on Solscan</a> | <a href="https://birdeye.so/token/${token.mintAddress}?chain=solana">Birdeye</a>`;
+📱 <b>Quick View:</b>
+<a href="https://dexscreener.com/solana/${token.mintAddress}">DexScreener</a> | <a href="https://solscan.io/token/${token.mintAddress}">Solscan</a> | <a href="https://birdeye.so/token/${token.mintAddress}?chain=solana">Birdeye</a>`;
 
     const telegramSent = await sendTelegramMessage(message);
 
