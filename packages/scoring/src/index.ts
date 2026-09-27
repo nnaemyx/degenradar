@@ -20,6 +20,7 @@ export interface ScoringResult {
   holderScore: number;
   socialScore: number;
   opportunityLevel: OpportunityLevel;
+  projectedMultiplier: string;
   isBlockedByRisk: boolean;
   modelVersion: string;
 }
@@ -30,6 +31,31 @@ export function classifyOpportunityLevel(score: number): OpportunityLevel {
   if (score >= 60) return "EARLY_SIGNAL";
   if (score >= 40) return "DEVELOPING";
   return "WATCH";
+}
+
+/**
+ * Predicts realistic short-term upside target multiple based on MC headroom & momentum
+ */
+export function estimateProjectedMultiplier(params: {
+  marketCap: number;
+  momentumScore: number;
+  buyPressure: number;
+  loreScore: number;
+}): string {
+  const { marketCap, momentumScore, buyPressure, loreScore } = params;
+
+  // Pump.fun / initial DEX curve target is usually $65k-$80k graduation
+  // If entry is $5k - $12k:
+  if (loreScore >= 75 && momentumScore >= 80) {
+    return "5x – 10x Target ($40K–$70K Curve Breakout)";
+  }
+  if (momentumScore >= 75 && buyPressure >= 0.7) {
+    return "3x – 5x Target ($20K–$35K Initial Run)";
+  }
+  if (momentumScore >= 60) {
+    return "2x – 3x Target ($12K–$18K Quick Double)";
+  }
+  return "1.5x – 2x Target (Scalp / Take Profit Early)";
 }
 
 /**
@@ -110,6 +136,12 @@ export function calculateRulesV1Score(inputs: ScoringInputs): ScoringResult {
     holderScore: Math.round(holderScore),
     socialScore: Math.round(socialScore),
     opportunityLevel: classifyOpportunityLevel(finalOpportunity),
+    projectedMultiplier: estimateProjectedMultiplier({
+      marketCap: 0,
+      momentumScore: Math.round(momentumScore),
+      buyPressure,
+      loreScore,
+    }),
     isBlockedByRisk,
     modelVersion,
   };

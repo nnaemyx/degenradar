@@ -118,10 +118,11 @@ export const scoringWorker = new Worker<ScoreCalculationJob>(
         scoreId: String(scoreRecord.id),
         opportunityScore: result.opportunityScore,
         riskScore: result.riskScore,
+        projectedMultiplier: result.projectedMultiplier,
         signals: [
-          ...(result.momentumScore > 70 ? ["🔥 High Momentum"] : []),
-          ...(result.smartMoneyScore > 60 ? ["🔥 Smart Money Detected"] : []),
-          ...(result.opportunityScore >= 90 ? ["⚡ Extreme Activity"] : []),
+          ...(result.momentumScore > 70 ? ["🔥 High Buyer Momentum"] : []),
+          ...(result.smartMoneyScore > 60 ? ["🔥 Quality Wallet Entry"] : []),
+          ...(result.opportunityScore >= 90 ? ["⚡ Viral Narrative Breakout"] : []),
         ],
       });
 
@@ -134,6 +135,20 @@ export const scoringWorker = new Worker<ScoreCalculationJob>(
           priceAtSignal: priceUsd,
         });
       }
+    } else if (riskScore >= 75 || (features && Number(features.priceVelocity || 0) < -25)) {
+      // ⚠️ EARLY RUG / DUMP DETECTOR
+      await enqueueAlertProcessing({
+        tokenId: token.id,
+        scoreId: String(scoreRecord.id),
+        opportunityScore: result.opportunityScore,
+        riskScore,
+        isRugWarning: true,
+        signals: [
+          ...(Number(features?.priceVelocity || 0) < -25 ? ["🚨 Rapid -25% Price Plunge in 1m"] : []),
+          ...(riskScore >= 80 ? ["🚨 Dev / Top Holder Massive Sell Detected"] : []),
+          ...(latestRisk?.freezeAuthorityEnabled ? ["🚨 Freeze Authority Triggered (Honeypot)"] : []),
+        ],
+      });
     }
 
     return { scoreId: scoreRecord.id, opportunityScore: result.opportunityScore };

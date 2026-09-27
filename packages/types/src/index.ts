@@ -235,7 +235,8 @@ export type AlertType =
   | "SMART_MONEY_ENTRY"
   | "VOLUME_ACCELERATION"
   | "HOLDER_SURGE"
-  | "RISK_ELEVATED";
+  | "RISK_ELEVATED"
+  | "RUG_WARNING";
 
 export interface Alert {
   id: string;
@@ -311,6 +312,8 @@ export interface AlertProcessingJob {
   opportunityScore: number;
   riskScore: number;
   signals: string[];
+  projectedMultiplier?: string;
+  isRugWarning?: boolean;
 }
 
 export interface OutcomeCalculationJob {
