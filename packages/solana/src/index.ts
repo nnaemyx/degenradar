@@ -79,3 +79,4 @@ export class SolanaService {
 }
 
 export const solana = new SolanaService();
+export { PublicKey, Connection } from "@solana/web3.js";

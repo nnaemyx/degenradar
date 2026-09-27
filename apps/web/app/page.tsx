@@ -24,44 +24,34 @@ export default function DashboardPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<"all" | "high_score" | "safe">("all");
 
-  // Initial seed demo tokens for instant dashboard vibrancy if DB is freshly empty
+  // Fetch real tokens discovered by the background scanner
   useEffect(() => {
-    if (tokens.size === 0) {
-      addDiscoveredToken({
-        mintAddress: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
-        symbol: "FRANK",
-        name: "Frank the Turtle",
-        priceUsd: 0.000184,
-        marketCap: 184200,
-        liquidityUsd: 62100,
-        opportunityScore: 86,
-        riskScore: 19,
-        firstSeenAt: new Date(Date.now() - 17 * 60000).toISOString(),
-      });
-      addDiscoveredToken({
-        mintAddress: "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
-        symbol: "TURTLE",
-        name: "Sea Explorer",
-        priceUsd: 0.000042,
-        marketCap: 91000,
-        liquidityUsd: 28400,
-        opportunityScore: 71,
-        riskScore: 32,
-        firstSeenAt: new Date(Date.now() - 45 * 60000).toISOString(),
-      });
-      addDiscoveredToken({
-        mintAddress: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
-        symbol: "SOLCAT",
-        name: "Solana Feline",
-        priceUsd: 0.0012,
-        marketCap: 520000,
-        liquidityUsd: 145000,
-        opportunityScore: 78,
-        riskScore: 15,
-        firstSeenAt: new Date(Date.now() - 8 * 60000).toISOString(),
-      });
+    async function loadInitialTokens() {
+      try {
+        const res = await fetch("http://localhost:3001/api/v1/tokens?limit=30");
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json.data && Array.isArray(json.data)) {
+          for (const item of json.data) {
+            addDiscoveredToken({
+              mintAddress: item.mintAddress,
+              symbol: item.symbol,
+              name: item.name,
+              priceUsd: Number(item.priceUsd) || 0,
+              marketCap: Number(item.marketCap) || 0,
+              liquidityUsd: Number(item.liquidityUsd) || 0,
+              opportunityScore: Number(item.latestScore) || 50,
+              riskScore: Number(item.riskScore) || 20,
+              firstSeenAt: item.firstSeenAt,
+            });
+          }
+        }
+      } catch (e) {
+        // API server not up yet or connecting
+      }
     }
-  }, [tokens.size, addDiscoveredToken]);
+    loadInitialTokens();
+  }, [addDiscoveredToken]);
 
   const tokenList = Array.from(tokens.values()).filter((t) => {
     if (activeTab === "high_score") return t.opportunityScore >= 75;
@@ -324,6 +314,19 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
+                {tokenList.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-gray-500 font-mono">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <Radio className="w-6 h-6 text-accent animate-pulse" />
+                        <span className="text-sm font-bold text-gray-300">24/7 Automated Blockchain Radar Active</span>
+                        <span className="text-xs text-gray-500">
+                          Scanning Solana mainnet blocks... Newly launched tokens will appear here automatically in real time.
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                )}
                 {tokenList.map((token) => {
                   const oppBadge = getOpportunityBadge(token.opportunityScore);
                   const riskBadge = getRiskBadge(token.riskScore);

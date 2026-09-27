@@ -6,6 +6,7 @@ import { birdeye } from "@degenradar/birdeye";
 import { createLogger } from "@degenradar/logger";
 import { eq } from "drizzle-orm";
 import type { TokenDiscoveryJob, TokenDiscoveredEvent } from "@degenradar/types";
+import { startSolanaLiveScanner } from "./scanner";
 
 const log = createLogger("worker-token-discovery");
 
@@ -112,3 +113,6 @@ tokenDiscoveryWorker.on("failed", (job, err) => {
 });
 
 log.info("Token Discovery Worker started and listening for jobs");
+
+// Launch the 24/7 Automated Blockchain Scanner
+startSolanaLiveScanner();
