@@ -1,0 +1,151 @@
+import { Worker } from "bullmq";
+import {
+  redis,
+  enqueueAlertProcessing,
+  enqueueOutcomeCalculation,
+  publishWsEvent,
+} from "@degenradar/redis";
+import {
+  db,
+  tokens,
+  riskAssessments,
+  tokenFeatures,
+  tokenSnapshots,
+  tokenScores,
+} from "@degenradar/db";
+import { calculateRulesV1Score } from "@degenradar/scoring";
+import { createLogger } from "@degenradar/logger";
+import { eq, desc } from "drizzle-orm";
+import type { ScoreCalculationJob, TokenScoreUpdatedEvent } from "@degenradar/types";
+
+const log = createLogger("worker-scoring");
+
+export const scoringWorker = new Worker<ScoreCalculationJob>(
+  "score-calculation",
+  async (job) => {
+    const { tokenId } = job.data;
+    log.info({ tokenId }, "Calculating token scores");
+
+    // 1. Fetch token record
+    const [token] = await db.select().from(tokens).where(eq(tokens.id, tokenId)).limit(1);
+    if (!token) return;
+
+    // 2. Fetch latest risk assessment
+    const [latestRisk] = await db
+      .select()
+      .from(riskAssessments)
+      .where(eq(riskAssessments.tokenId, token.id))
+      .orderBy(desc(riskAssessments.timestamp))
+      .limit(1);
+
+    const riskScore = latestRisk ? Number(latestRisk.overallRiskScore) : 50;
+
+    // 3. Fetch latest features
+    const [features] = await db
+      .select()
+      .from(tokenFeatures)
+      .where(eq(tokenFeatures.tokenId, token.id))
+      .orderBy(desc(tokenFeatures.timestamp))
+      .limit(1);
+
+    // 4. Fetch latest snapshot
+    const [snapshot] = await db
+      .select()
+      .from(tokenSnapshots)
+      .where(eq(tokenSnapshots.tokenId, token.id))
+      .orderBy(desc(tokenSnapshots.timestamp))
+      .limit(1);
+
+    const liquidityUsd = snapshot ? Number(snapshot.liquidityUsd || 0) : 0;
+    const priceUsd = snapshot ? Number(snapshot.priceUsd || 0) : 0;
+
+    // 5. Calculate Score
+    const result = calculateRulesV1Score({
+      riskScore,
+      volumeVelocity: features ? Number(features.volumeVelocity || 0) : 0,
+      priceVelocity: features ? Number(features.priceVelocity || 0) : 0,
+      buyPressure: features ? Number(features.buyPressure || 0.5) : 0.5,
+      holderGrowthPct: features ? Number(features.holderVelocity || 0) : 0,
+      smartMoneyCount: 0,
+      liquidityUsd,
+      loreScore: 0,
+    });
+
+    // 6. Insert into token_scores (always preserve historical time series for backtesting)
+    const [scoreRecord] = await db
+      .insert(tokenScores)
+      .values({
+        tokenId: token.id,
+        opportunityScore: String(result.opportunityScore),
+        riskScore: String(result.riskScore),
+        momentumScore: String(result.momentumScore),
+        smartMoneyScore: String(result.smartMoneyScore),
+        liquidityScore: String(result.liquidityScore),
+        holderScore: String(result.holderScore),
+        socialScore: String(result.socialScore),
+        modelVersion: result.modelVersion,
+      })
+      .returning();
+
+    // 7. Publish WebSocket broadcast
+    await publishWsEvent<TokenScoreUpdatedEvent>({
+      type: "TOKEN_SCORE_UPDATED",
+      timestamp: new Date().toISOString(),
+      data: {
+        mintAddress: token.mintAddress,
+        symbol: token.symbol,
+        opportunityScore: result.opportunityScore,
+        riskScore: result.riskScore,
+        momentumScore: result.momentumScore,
+        modelVersion: result.modelVersion,
+      },
+    });
+
+    log.info(
+      {
+        tokenId,
+        mint: token.mintAddress,
+        opportunity: result.opportunityScore,
+        level: result.opportunityLevel,
+      },
+      "Token scored successfully"
+    );
+
+    // 8. If strong opportunity signal, trigger Alert Engine
+    if (result.opportunityScore >= 75) {
+      await enqueueAlertProcessing({
+        tokenId: token.id,
+        scoreId: String(scoreRecord.id),
+        opportunityScore: result.opportunityScore,
+        riskScore: result.riskScore,
+        signals: [
+          ...(result.momentumScore > 70 ? ["🔥 High Momentum"] : []),
+          ...(result.smartMoneyScore > 60 ? ["🔥 Smart Money Detected"] : []),
+          ...(result.opportunityScore >= 90 ? ["⚡ Extreme Activity"] : []),
+        ],
+      });
+
+      // 9. Enqueue outcome check (record baseline for backtesting)
+      if (priceUsd > 0) {
+        await enqueueOutcomeCalculation({
+          tokenId: token.id,
+          signalId: String(scoreRecord.id),
+          signalTimestamp: new Date().toISOString(),
+          priceAtSignal: priceUsd,
+        });
+      }
+    }
+
+    return { scoreId: scoreRecord.id, opportunityScore: result.opportunityScore };
+  },
+  {
+    connection: redis,
+    concurrency: 20,
+  }
+);
+
+scoringWorker.on("failed", (job, err) => {
+  log.error({ jobId: job?.id, err }, "Scoring worker job failed");
+});
+
+log.info("Scoring Engine Worker started and listening for jobs");

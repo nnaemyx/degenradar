@@ -1,0 +1,25 @@
+{
+  "name": "@degenradar/worker-scoring",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@degenradar/config": "workspace:*",
+    "@degenradar/db": "workspace:*",
+    "@degenradar/scoring": "workspace:*",
+    "@degenradar/logger": "workspace:*",
+    "@degenradar/redis": "workspace:*",
+    "@degenradar/types": "workspace:*",
+    "bullmq": "^5.34.4",
+    "drizzle-orm": "^0.38.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

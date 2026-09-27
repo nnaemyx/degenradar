@@ -1,0 +1,26 @@
+{
+  "name": "degenradar",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "clean": "turbo run clean",
+    "db:generate": "pnpm --filter @degenradar/db generate",
+    "db:migrate": "pnpm --filter @degenradar/db migrate",
+    "db:studio": "pnpm --filter @degenradar/db studio"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2",
+    "@types/node": "^22.10.0",
+    "prettier": "^3.4.2"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@10.17.0"
+}
