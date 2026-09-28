@@ -28,7 +28,8 @@ export default function DashboardPage() {
   useEffect(() => {
     async function loadInitialTokens() {
       try {
-        const res = await fetch("http://localhost:3001/api/v1/tokens?limit=30");
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        const res = await fetch(`${apiUrl}/api/v1/tokens?limit=30`);
         if (!res.ok) return;
         const json = await res.json();
         if (json.data && Array.isArray(json.data)) {
@@ -65,7 +66,8 @@ export default function DashboardPage() {
 
     setIsSubmitting(true);
     try {
-      const res = await fetch("http://localhost:3001/api/v1/tokens/discover", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const res = await fetch(`${apiUrl}/api/v1/tokens/discover`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mintAddress: manualMint.trim() }),

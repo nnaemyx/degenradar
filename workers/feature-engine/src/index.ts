@@ -23,17 +23,49 @@ export const featureWorker = new Worker<FeatureCalculationJob>(
     const [token] = await db.select().from(tokens).where(eq(tokens.id, tokenId)).limit(1);
     if (!token) return;
 
-    // 2. Fetch or create a fresh token snapshot from Birdeye
+    // 2. Fetch or create a fresh token snapshot from Birdeye (with DexScreener fallback)
+    let price = 0;
+    let mc = 0;
+    let liquidity = 0;
+    let v5m = 0;
+    let v1h = 0;
+    let holders = 0;
+
     const overview = await birdeye.getTokenOverview(token.mintAddress);
-    if (overview) {
+    if (overview && (overview.price || overview.mc || overview.liquidity)) {
+      price = overview.price || 0;
+      mc = overview.mc || 0;
+      liquidity = overview.liquidity || 0;
+      v5m = overview.v5mUSD || 0;
+      v1h = overview.v1hUSD || 0;
+      holders = overview.holder || 0;
+    } else {
+      // Fallback to DexScreener for newly launched tokens & Pump.fun bonding curves
+      try {
+        const dexRes = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${token.mintAddress}`);
+        if (dexRes.ok) {
+          const dexData = (await dexRes.json()) as any;
+          const pair = dexData?.pairs?.[0];
+          if (pair) {
+            price = Number(pair.priceUsd) || 0;
+            mc = Number(pair.marketCap || pair.fdv) || 0;
+            liquidity = Number(pair.liquidity?.usd) || 0;
+            v5m = Number(pair.volume?.m5) || 0;
+            v1h = Number(pair.volume?.h1) || 0;
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (price > 0 || mc > 0 || liquidity > 0) {
       await db.insert(tokenSnapshots).values({
         tokenId: token.id,
-        priceUsd: String(overview.price || 0),
-        marketCap: String(overview.mc || 0),
-        liquidityUsd: String(overview.liquidity || 0),
-        volume5m: String(overview.v5mUSD || 0),
-        volume1h: String(overview.v1hUSD || 0),
-        holders: overview.holder || 0,
+        priceUsd: String(price),
+        marketCap: String(mc),
+        liquidityUsd: String(liquidity),
+        volume5m: String(v5m),
+        volume1h: String(v1h),
+        holders,
       });
     }
 

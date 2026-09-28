@@ -31,6 +31,9 @@ export function useDegenSocket() {
                   symbol: payload.data.symbol,
                   name: payload.data.name,
                   firstSeenAt: payload.data.firstSeenAt,
+                  priceUsd: payload.data.priceUsd,
+                  marketCap: payload.data.marketCap,
+                  liquidityUsd: payload.data.liquidityUsd,
                 });
                 break;
 
@@ -39,7 +42,10 @@ export function useDegenSocket() {
                   payload.data.mintAddress,
                   payload.data.opportunityScore,
                   payload.data.riskScore,
-                  payload.data.symbol
+                  payload.data.symbol,
+                  payload.data.priceUsd,
+                  payload.data.marketCap,
+                  payload.data.liquidityUsd
                 );
                 break;
 

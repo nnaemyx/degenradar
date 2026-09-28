@@ -98,6 +98,9 @@ export const scoringWorker = new Worker<ScoreCalculationJob>(
         riskScore: result.riskScore,
         momentumScore: result.momentumScore,
         modelVersion: result.modelVersion,
+        priceUsd: priceUsd > 0 ? priceUsd : null,
+        marketCap: snapshot?.marketCap ? Number(snapshot.marketCap) : null,
+        liquidityUsd: liquidityUsd > 0 ? liquidityUsd : null,
       },
     });
 

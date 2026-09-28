@@ -128,6 +128,9 @@ export function startSolanaLiveScanner() {
             name: t.name || "Trending Token",
             creatorAddress: null,
             firstSeenAt: new Date().toISOString(),
+            priceUsd: t.price || 0,
+            marketCap: t.marketcap || 0,
+            liquidityUsd: t.liquidity || 0,
           },
         });
 

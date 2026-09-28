@@ -347,6 +347,9 @@ export interface TokenScoreUpdatedEvent {
   riskScore: number;
   momentumScore: number | null;
   modelVersion: string;
+  priceUsd?: number | null;
+  marketCap?: number | null;
+  liquidityUsd?: number | null;
 }
 
 export interface TokenDiscoveredEvent {
@@ -355,6 +358,9 @@ export interface TokenDiscoveredEvent {
   name: string | null;
   creatorAddress: string | null;
   firstSeenAt: string;
+  priceUsd?: number | null;
+  marketCap?: number | null;
+  liquidityUsd?: number | null;
 }
 
 // ─── API Response Types ───────────────────────────────────────────────────────

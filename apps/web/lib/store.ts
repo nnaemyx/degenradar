@@ -28,7 +28,15 @@ interface DegenState {
   alerts: LiveAlertItem[];
   isConnected: boolean;
   setConnected: (status: boolean) => void;
-  updateTokenScore: (mint: string, opportunity: number, risk: number, symbol?: string | null) => void;
+  updateTokenScore: (
+    mint: string,
+    opportunity: number,
+    risk: number,
+    symbol?: string | null,
+    priceUsd?: number | null,
+    marketCap?: number | null,
+    liquidityUsd?: number | null
+  ) => void;
   addDiscoveredToken: (item: Partial<LiveTokenItem> & { mintAddress: string }) => void;
   addAlert: (alert: LiveAlertItem) => void;
 }
@@ -39,7 +47,15 @@ export const useDegenStore = create<DegenState>((set) => ({
   isConnected: false,
   setConnected: (status) => set({ isConnected: status }),
 
-  updateTokenScore: (mint: string, opportunity: number, risk: number, symbol?: string | null) =>
+  updateTokenScore: (
+    mint: string,
+    opportunity: number,
+    risk: number,
+    symbol?: string | null,
+    priceUsd?: number | null,
+    marketCap?: number | null,
+    liquidityUsd?: number | null
+  ) =>
     set((state) => {
       const next = new Map(state.tokens);
       const current = next.get(mint);
@@ -49,6 +65,9 @@ export const useDegenStore = create<DegenState>((set) => ({
           symbol: (symbol && symbol !== "SCANNING" && symbol !== "UNKNOWN") ? symbol : current.symbol,
           opportunityScore: opportunity,
           riskScore: risk,
+          priceUsd: (priceUsd !== undefined && priceUsd !== null && priceUsd > 0) ? priceUsd : current.priceUsd,
+          marketCap: (marketCap !== undefined && marketCap !== null && marketCap > 0) ? marketCap : current.marketCap,
+          liquidityUsd: (liquidityUsd !== undefined && liquidityUsd !== null && liquidityUsd > 0) ? liquidityUsd : current.liquidityUsd,
         });
       }
       return { tokens: next };

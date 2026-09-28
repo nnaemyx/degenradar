@@ -126,6 +126,9 @@ export const tokenDiscoveryWorker = new Worker<TokenDiscoveryJob>(
         name: tokenRecord.name,
         creatorAddress: tokenRecord.creatorAddress,
         firstSeenAt: tokenRecord.firstSeenAt.toISOString(),
+        priceUsd: birdeyeOverview?.price || 0,
+        marketCap: birdeyeOverview?.mc || 0,
+        liquidityUsd: birdeyeOverview?.liquidity || 0,
       },
     });
 
