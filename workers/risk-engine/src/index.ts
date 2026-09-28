@@ -95,7 +95,7 @@ export const riskWorker = new Worker<RiskAnalysisJob>(
     return { assessmentId: assessment.id, overallRisk };
   },
   {
-    ...defaultWorkerOptions,
+    connection: redis,
     concurrency: 10,
   }
 );

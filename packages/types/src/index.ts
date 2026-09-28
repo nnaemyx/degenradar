@@ -275,7 +275,7 @@ export interface TokenOutcome {
 export interface TokenDiscoveryJob {
   mintAddress: string;
   detectedAt: string;
-  source: "helius_ws" | "birdeye_new" | "birdeye_trending" | "db_momentum_recheck" | "manual";
+  source: "helius_ws" | "birdeye_new" | "birdeye_trending" | "birdeye_top_gainers" | "birdeye_price_mover" | "db_momentum_recheck" | "manual";
 }
 
 export interface TradeProcessingJob {
@@ -304,6 +304,10 @@ export interface ScoreCalculationJob {
   tokenId: string;
   timestamp: string;
   triggerSource: "scheduled" | "event" | "backfill";
+  // Live market performance data (passed from feature engine to avoid extra DB reads)
+  priceChange1h?: number;   // % price change in last 1h
+  priceChange24h?: number;  // % price change in last 24h
+  volume24h?: number;       // 24h volume in USD
 }
 
 export interface AlertProcessingJob {

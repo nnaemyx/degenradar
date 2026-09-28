@@ -106,7 +106,7 @@ export function startSolanaLiveScanner() {
     }
   }
 
-  // 3. Trending & High-Performing Solana Tokens Poller (Birdeye)
+  // 3. Trending & High-Performing Solana Tokens Poller (Birdeye trending rank)
   async function pollTrendingTokens() {
     try {
       if (!env.BIRDEYE_API_KEY) return;
@@ -118,7 +118,6 @@ export function startSolanaLiveScanner() {
       for (const t of trending) {
         if (!t.address) continue;
 
-        // Instant UI broadcast so dashboard shows real symbol & price immediately
         await publishWsEvent<TokenDiscoveredEvent>({
           type: "TOKEN_DISCOVERED",
           timestamp: new Date().toISOString(),
@@ -134,7 +133,6 @@ export function startSolanaLiveScanner() {
           },
         });
 
-        // Queue for risk assessment & live scoring
         await enqueueTokenDiscovery({
           mintAddress: t.address,
           detectedAt: new Date().toISOString(),
@@ -146,7 +144,83 @@ export function startSolanaLiveScanner() {
     }
   }
 
-  // 4. Stored Tokens Momentum Monitor (Continually re-evaluates database tokens)
+  // 4. TOP GAINERS poller — tokens doing well sorted by 24h volume (catches established performers)
+  async function pollTopGainers() {
+    try {
+      if (!env.BIRDEYE_API_KEY) return;
+      const gainers = await birdeye.getTopGainers(15, 5000);
+      if (!gainers || gainers.length === 0) return;
+
+      log.info({ count: gainers.length }, "📈 Scanned top gainers by 24h volume");
+
+      for (const t of gainers) {
+        if (!t.address) continue;
+
+        await publishWsEvent<TokenDiscoveredEvent>({
+          type: "TOKEN_DISCOVERED",
+          timestamp: new Date().toISOString(),
+          data: {
+            mintAddress: t.address,
+            symbol: t.symbol || "GAINER",
+            name: t.name || "Top Gainer",
+            creatorAddress: null,
+            firstSeenAt: new Date().toISOString(),
+            priceUsd: t.price || 0,
+            marketCap: t.marketcap || 0,
+            liquidityUsd: t.liquidity || 0,
+          },
+        });
+
+        await enqueueTokenDiscovery({
+          mintAddress: t.address,
+          detectedAt: new Date().toISOString(),
+          source: "birdeye_top_gainers",
+        });
+      }
+    } catch (e) {
+      log.debug({ err: (e as Error).message }, "Top gainers poller notice");
+    }
+  }
+
+  // 5. PRICE MOVERS poller — tokens with the highest 24h % price change (breakout detection)
+  async function pollTopPriceMovers() {
+    try {
+      if (!env.BIRDEYE_API_KEY) return;
+      const movers = await birdeye.getTopPriceMovers(15, 5000);
+      if (!movers || movers.length === 0) return;
+
+      log.info({ count: movers.length }, "🚀 Scanned top 24h price movers");
+
+      for (const t of movers) {
+        if (!t.address) continue;
+
+        await publishWsEvent<TokenDiscoveredEvent>({
+          type: "TOKEN_DISCOVERED",
+          timestamp: new Date().toISOString(),
+          data: {
+            mintAddress: t.address,
+            symbol: t.symbol || "MOVER",
+            name: t.name || "Price Mover",
+            creatorAddress: null,
+            firstSeenAt: new Date().toISOString(),
+            priceUsd: t.price || 0,
+            marketCap: t.marketcap || 0,
+            liquidityUsd: t.liquidity || 0,
+          },
+        });
+
+        await enqueueTokenDiscovery({
+          mintAddress: t.address,
+          detectedAt: new Date().toISOString(),
+          source: "birdeye_price_mover",
+        });
+      }
+    } catch (e) {
+      log.debug({ err: (e as Error).message }, "Price movers poller notice");
+    }
+  }
+
+  // 6. Stored Tokens Momentum Monitor (Continually re-evaluates database tokens)
   async function pollStoredTokensForMomentum() {
     try {
       const stored = await db
@@ -175,12 +249,18 @@ export function startSolanaLiveScanner() {
   // Run initial polls immediately on startup
   pollNewListings();
   pollTrendingTokens();
+  pollTopGainers();
+  pollTopPriceMovers();
 
   // Polling intervals (reduced to save Upstash Redis free-tier commands):
   // - Newly listed: every 30s  (was 15s)
   // - Trending / top performers: every 2 min  (was 45s)
+  // - Top gainers by volume: every 3 min
+  // - Top price movers (24h %): every 5 min
   // - Stored tokens momentum check: every 3 min  (was 60s)
   setInterval(pollNewListings, 30000);
   setInterval(pollTrendingTokens, 120000);
+  setInterval(pollTopGainers, 180000);
+  setInterval(pollTopPriceMovers, 300000);
   setInterval(pollStoredTokensForMomentum, 180000);
 }

@@ -61,6 +61,11 @@ export const scoringWorker = new Worker<ScoreCalculationJob>(
     const priceUsd = snapshot ? Number(snapshot.priceUsd || 0) : 0;
     const marketCap = snapshot ? Number(snapshot.marketCap || 0) : 0;
 
+    // Live performance data forwarded from feature engine (avoids extra API calls)
+    const priceChange1h = job.data.priceChange1h ?? 0;
+    const priceChange24h = job.data.priceChange24h ?? 0;
+    const volume24h = job.data.volume24h ?? 0;
+
     // Detect cultural lore, narrative category & meme potential
     const loreInfo = detectTokenLore({
       name: token.name,
@@ -79,6 +84,9 @@ export const scoringWorker = new Worker<ScoreCalculationJob>(
       liquidityUsd,
       marketCap,
       loreScore: loreInfo.loreScore,
+      priceChange1h,
+      priceChange24h,
+      volume24h,
     });
 
     // 6. Insert into token_scores (always preserve historical time series for backtesting)
@@ -125,7 +133,8 @@ export const scoringWorker = new Worker<ScoreCalculationJob>(
     );
 
     // 8. If strong opportunity signal, trigger Alert Engine
-    if (result.opportunityScore >= 75) {
+    const alertThreshold = Number(process.env.OPPORTUNITY_ALERT_THRESHOLD ?? 55);
+    if (result.opportunityScore >= alertThreshold) {
       await enqueueAlertProcessing({
         tokenId: token.id,
         scoreId: String(scoreRecord.id),
@@ -135,10 +144,11 @@ export const scoringWorker = new Worker<ScoreCalculationJob>(
         lore: loreInfo.lore,
         category: loreInfo.category,
         signals: [
+          ...(result.performanceScore > 50 ? [`📈 Performing Well (24h Score: ${result.performanceScore}/100)`] : []),
           ...(result.momentumScore > 70 ? ["🔥 High Buyer Momentum"] : []),
-          ...(result.smartMoneyScore > 60 ? ["🔥 Quality Wallet Entry"] : []),
+          ...(result.smartMoneyScore > 60 ? ["💎 Quality Wallet Entry"] : []),
           ...(result.opportunityScore >= 90 ? ["⚡ Viral Narrative Breakout"] : []),
-          ...(marketCap >= 100_000 ? [`📈 Strong Market Runner ($${Math.round(marketCap / 1000)}K MC)`] : []),
+          ...(marketCap >= 100_000 ? [`📊 Market Runner ($${Math.round(marketCap / 1000)}K MC)`] : ["🌱 Early Gem Discovery"]),
         ],
       });
 

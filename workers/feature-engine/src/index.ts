@@ -30,6 +30,9 @@ export const featureWorker = new Worker<FeatureCalculationJob>(
     let v5m = 0;
     let v1h = 0;
     let holders = 0;
+    let priceChange1h = 0;
+    let priceChange24h = 0;
+    let volume24h = 0;
 
     const overview = await birdeye.getTokenOverview(token.mintAddress);
     if (overview && (overview.price || overview.mc || overview.liquidity)) {
@@ -39,6 +42,8 @@ export const featureWorker = new Worker<FeatureCalculationJob>(
       v5m = overview.v5mUSD || 0;
       v1h = overview.v1hUSD || 0;
       holders = overview.holder || 0;
+      priceChange24h = overview.v24hChangePercent || 0;
+      volume24h = overview.v24hUSD || 0;
     } else {
       // Fallback to DexScreener for newly launched tokens & Pump.fun bonding curves
       try {
@@ -52,6 +57,9 @@ export const featureWorker = new Worker<FeatureCalculationJob>(
             liquidity = Number(pair.liquidity?.usd) || 0;
             v5m = Number(pair.volume?.m5) || 0;
             v1h = Number(pair.volume?.h1) || 0;
+            priceChange1h = Number(pair.priceChange?.h1) || 0;
+            priceChange24h = Number(pair.priceChange?.h24) || 0;
+            volume24h = Number(pair.volume?.h24) || 0;
           }
         }
       } catch (e) {}
@@ -100,15 +108,18 @@ export const featureWorker = new Worker<FeatureCalculationJob>(
     });
 
     log.info(
-      { tokenId, volumeVelocity, priceVelocity, buyPressure },
+      { tokenId, volumeVelocity, priceVelocity, buyPressure, priceChange24h, volume24h },
       "Features calculated successfully"
     );
 
-    // 6. Enqueue score calculation
+    // 6. Enqueue score calculation (pass live performance data for established-coin scoring)
     await enqueueScoreCalculation({
       tokenId: token.id,
       timestamp: new Date().toISOString(),
       triggerSource: "event",
+      priceChange1h,
+      priceChange24h,
+      volume24h,
     });
 
     return { tokenId };

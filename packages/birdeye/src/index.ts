@@ -130,17 +130,12 @@ export class BirdeyeClient {
   }
 
   /**
-   * Get trending Solana tokens (tokens that are actively performing / doing well)
+   * Get trending Solana tokens sorted by rank
    */
   async getTrendingTokens(limit = 20): Promise<BirdeyeTrendingToken[]> {
     try {
       const response = await this.http.get("/defi/token_trending", {
-        params: {
-          sort_by: "rank",
-          sort_type: "asc",
-          offset: 0,
-          limit,
-        },
+        params: { sort_by: "rank", sort_type: "asc", offset: 0, limit },
       });
       if (response.data?.success && response.data?.data?.tokens) {
         return response.data.data.tokens as BirdeyeTrendingToken[];
@@ -148,6 +143,55 @@ export class BirdeyeClient {
       return [];
     } catch (error) {
       log.debug({ error: (error as Error).message }, "Birdeye getTrendingTokens request failed");
+      return [];
+    }
+  }
+
+  /**
+   * Get top gainers on Solana — tokens doing well right now sorted by 24h volume.
+   * This is the most reliable signal for "coins performing well" regardless of age.
+   */
+  async getTopGainers(limit = 20, minLiquidityUsd = 5000): Promise<BirdeyeTrendingToken[]> {
+    try {
+      const response = await this.http.get("/defi/v2/tokens/list", {
+        params: {
+          sort_by: "v24hUSD",
+          sort_type: "desc",
+          offset: 0,
+          limit,
+          min_liquidity: minLiquidityUsd,
+        },
+      });
+      if (response.data?.success && response.data?.data?.tokens) {
+        return response.data.data.tokens as BirdeyeTrendingToken[];
+      }
+      return [];
+    } catch (error) {
+      log.debug({ error: (error as Error).message }, "Birdeye getTopGainers request failed");
+      return [];
+    }
+  }
+
+  /**
+   * Get tokens sorted by 24h price change — catches breakout movers early
+   */
+  async getTopPriceMovers(limit = 20, minLiquidityUsd = 5000): Promise<BirdeyeTrendingToken[]> {
+    try {
+      const response = await this.http.get("/defi/v2/tokens/list", {
+        params: {
+          sort_by: "priceChange24hPercent",
+          sort_type: "desc",
+          offset: 0,
+          limit,
+          min_liquidity: minLiquidityUsd,
+        },
+      });
+      if (response.data?.success && response.data?.data?.tokens) {
+        return response.data.data.tokens as BirdeyeTrendingToken[];
+      }
+      return [];
+    } catch (error) {
+      log.debug({ error: (error as Error).message }, "Birdeye getTopPriceMovers request failed");
       return [];
     }
   }
