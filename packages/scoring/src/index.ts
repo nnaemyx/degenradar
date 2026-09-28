@@ -1,4 +1,5 @@
 import type { OpportunityLevel } from "@degenradar/types";
+export * from "./lore";
 
 export interface ScoringInputs {
   riskScore: number; // 0 - 100
@@ -8,6 +9,7 @@ export interface ScoringInputs {
   holderGrowthPct: number;
   smartMoneyCount: number;
   liquidityUsd: number;
+  marketCap?: number;
   loreScore?: number; // 0 - 100
 }
 
@@ -34,7 +36,7 @@ export function classifyOpportunityLevel(score: number): OpportunityLevel {
 }
 
 /**
- * Predicts realistic short-term upside target multiple based on MC headroom & momentum
+ * Predicts realistic upside target multiple across both micro-caps ($5k-$20k) and mid-caps ($100k-$500k+)
  */
 export function estimateProjectedMultiplier(params: {
   marketCap: number;
@@ -44,18 +46,28 @@ export function estimateProjectedMultiplier(params: {
 }): string {
   const { marketCap, momentumScore, buyPressure, loreScore } = params;
 
-  // Pump.fun / initial DEX curve target is usually $65k-$80k graduation
-  // If entry is $5k - $12k:
+  // 1. Established / Mid-Cap Runners ($100k - $2M+)
+  if (marketCap >= 100_000) {
+    if (momentumScore >= 80 && buyPressure >= 0.7) {
+      return "3x – 5x Mid-Cap Runner ($500K–$1M+ Target)";
+    }
+    if (momentumScore >= 60) {
+      return "2x – 3x Solid Momentum Rally";
+    }
+    return "1.5x – 2x Continuation Move";
+  }
+
+  // 2. Early Ground-Floor Entry ($5K - $100K)
   if (loreScore >= 75 && momentumScore >= 80) {
-    return "5x – 10x Target ($40K–$70K Curve Breakout)";
+    return "5x – 10x Curve Breakout ($50K–$150K Target)";
   }
   if (momentumScore >= 75 && buyPressure >= 0.7) {
-    return "3x – 5x Target ($20K–$35K Initial Run)";
+    return "3x – 5x Initial Run ($25K–$60K Target)";
   }
   if (momentumScore >= 60) {
-    return "2x – 3x Target ($12K–$18K Quick Double)";
+    return "2x – 3x Quick Double ($15K–$30K Target)";
   }
-  return "1.5x – 2x Target (Scalp / Take Profit Early)";
+  return "1.5x – 2x Scalp (Take Profit Early)";
 }
 
 /**
@@ -71,6 +83,7 @@ export function calculateRulesV1Score(inputs: ScoringInputs): ScoringResult {
     holderGrowthPct,
     smartMoneyCount,
     liquidityUsd,
+    marketCap = 0,
     loreScore = 0,
   } = inputs;
 
@@ -137,7 +150,7 @@ export function calculateRulesV1Score(inputs: ScoringInputs): ScoringResult {
     socialScore: Math.round(socialScore),
     opportunityLevel: classifyOpportunityLevel(finalOpportunity),
     projectedMultiplier: estimateProjectedMultiplier({
-      marketCap: 0,
+      marketCap: marketCap || 0,
       momentumScore: Math.round(momentumScore),
       buyPressure,
       loreScore,

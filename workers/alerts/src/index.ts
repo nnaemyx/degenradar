@@ -53,7 +53,12 @@ export const alertWorker = new Worker<AlertProcessingJob>(
     const mintRevoked = !token.mintAuthority ? "✅ Revoked" : "❌ Active (DANGEROUS)";
     const freezeRevoked = !token.freezeAuthority ? "✅ Revoked" : "❌ Active (DANGEROUS)";
 
-    const { projectedMultiplier = "2x – 3x Target", isRugWarning = false } = job.data;
+    const {
+      projectedMultiplier = "2x – 3x Target",
+      isRugWarning = false,
+      lore,
+      category,
+    } = job.data;
 
     let message = "";
     let alertType: "RUG_WARNING" | "EXTREME_SIGNAL" | "STRONG_SIGNAL" = "STRONG_SIGNAL";
@@ -79,7 +84,12 @@ Consider taking profits or selling your position immediately!
 📱 <a href="https://jup.ag/swap/SOL-${token.mintAddress}">Emergency Sell on Jupiter</a> | <a href="https://dexscreener.com/solana/${token.mintAddress}">DexScreener</a>`;
     } else {
       alertType = opportunityScore >= 90 ? "EXTREME_SIGNAL" : "STRONG_SIGNAL";
-      message = `🚨 <b>DEGENRADAR EARLY SIGNAL ($5K–$12K SWEET SPOT)</b>
+      const mcNum = snapshot?.marketCap ? Number(snapshot.marketCap) : 0;
+      const headerTitle = mcNum >= 100_000
+        ? `🔥 <b>DEGENRADAR MARKET RUNNER ALERT ($${Math.round(mcNum / 1000)}K MC)</b>`
+        : `🚨 <b>DEGENRADAR HIGH CONVICTION SIGNAL</b>`;
+
+      message = `${headerTitle}
 
 <b>Token:</b> <b>$${token.symbol || "UNKNOWN"}</b> (${token.name || "Token"})
 <b>Mint:</b> <code>${token.mintAddress}</code>
@@ -87,13 +97,17 @@ Consider taking profits or selling your position immediately!
 🎯 <b>Projected Potential:</b> <b>${projectedMultiplier}</b>
 🎯 <b>Opportunity Score:</b> <b>${opportunityScore}/100</b>
 
+📖 <b>Culture & Meme Lore:</b>
+• <b>Archetype:</b> <b>${category || "💎 Cult Meme"}</b>
+• <b>Story:</b> <i>"${lore || "Organic community momentum with active volume velocity on Solana."}"</i>
+
 🛡️ <b>Safety Verification:</b>
 • Mint Authority: <b>${mintRevoked}</b>
 • Freeze Authority: <b>${freezeRevoked}</b>
 • Risk Score: <b>${riskScore}/100</b> (🟢 VERIFIED CLEAN)
 
-📊 <b>Micro-Cap Metrics:</b>
-• Market Cap: <b>${mc}</b> (Target Entry Window)
+📊 <b>Live Market Metrics:</b>
+• Market Cap: <b>${mc}</b>
 • Liquidity: <b>${liq}</b>
 • Price: <b>${price}</b>
 

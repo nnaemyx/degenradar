@@ -314,6 +314,8 @@ export interface AlertProcessingJob {
   signals: string[];
   projectedMultiplier?: string;
   isRugWarning?: boolean;
+  lore?: string;
+  category?: string;
 }
 
 export interface OutcomeCalculationJob {

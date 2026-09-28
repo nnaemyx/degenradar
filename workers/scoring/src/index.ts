@@ -13,7 +13,7 @@ import {
   tokenSnapshots,
   tokenScores,
 } from "@degenradar/db";
-import { calculateRulesV1Score } from "@degenradar/scoring";
+import { calculateRulesV1Score, detectTokenLore } from "@degenradar/scoring";
 import { createLogger } from "@degenradar/logger";
 import { eq, desc } from "drizzle-orm";
 import type { ScoreCalculationJob, TokenScoreUpdatedEvent } from "@degenradar/types";
@@ -58,6 +58,14 @@ export const scoringWorker = new Worker<ScoreCalculationJob>(
 
     const liquidityUsd = snapshot ? Number(snapshot.liquidityUsd || 0) : 0;
     const priceUsd = snapshot ? Number(snapshot.priceUsd || 0) : 0;
+    const marketCap = snapshot ? Number(snapshot.marketCap || 0) : 0;
+
+    // Detect cultural lore, narrative category & meme potential
+    const loreInfo = detectTokenLore({
+      name: token.name,
+      symbol: token.symbol,
+      marketCap,
+    });
 
     // 5. Calculate Score
     const result = calculateRulesV1Score({
@@ -68,7 +76,8 @@ export const scoringWorker = new Worker<ScoreCalculationJob>(
       holderGrowthPct: features ? Number(features.holderVelocity || 0) : 0,
       smartMoneyCount: 0,
       liquidityUsd,
-      loreScore: 0,
+      marketCap,
+      loreScore: loreInfo.loreScore,
     });
 
     // 6. Insert into token_scores (always preserve historical time series for backtesting)
@@ -122,10 +131,13 @@ export const scoringWorker = new Worker<ScoreCalculationJob>(
         opportunityScore: result.opportunityScore,
         riskScore: result.riskScore,
         projectedMultiplier: result.projectedMultiplier,
+        lore: loreInfo.lore,
+        category: loreInfo.category,
         signals: [
           ...(result.momentumScore > 70 ? ["🔥 High Buyer Momentum"] : []),
           ...(result.smartMoneyScore > 60 ? ["🔥 Quality Wallet Entry"] : []),
           ...(result.opportunityScore >= 90 ? ["⚡ Viral Narrative Breakout"] : []),
+          ...(marketCap >= 100_000 ? [`📈 Strong Market Runner ($${Math.round(marketCap / 1000)}K MC)`] : []),
         ],
       });
 
