@@ -9,14 +9,20 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        background: "#090A0F",
-        surface: "#12141F",
-        card: "#181B2B",
-        border: "#23273D",
-        accent: "#00FFA3", // Solana Cyan/Green
-        primary: "#9945FF", // Solana Purple
-        danger: "#FF3B69",
-        warning: "#FFB020",
+        background: "#090c11",
+        surface: "#0c1016",
+        raised: "#10151c",
+        card: "#10151c",
+        border: "#27313a",
+        accent: "#00e59b",
+        secondary: "#8f67ff",
+        caution: "#fbbf24",
+        "risk-high": "#fb7185",
+        muted: "#94a3b8",
+      },
+      fontFamily: {
+        brand: ["Space Grotesk", "ui-sans-serif", "system-ui", "sans-serif"],
+        data: ["IBM Plex Mono", "ui-monospace", "SFMono-Regular", "monospace"],
       },
     },
   },
