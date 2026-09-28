@@ -42,8 +42,10 @@ export const outcomeCalculationQueue = new Queue<OutcomeCalculationJob>("outcome
 
 // Helper methods to enqueue jobs with idempotency keys
 export async function enqueueTokenDiscovery(job: TokenDiscoveryJob) {
+  // Deduplicate within a 60-second window, allowing periodic momentum re-evaluations
+  const timeWindow = Math.floor(Date.now() / 60000);
   return tokenDiscoveryQueue.add("discover", job, {
-    jobId: `discover:${job.mintAddress}`,
+    jobId: `discover:${job.mintAddress}:${timeWindow}`,
   });
 }
 
@@ -61,8 +63,9 @@ export async function enqueueHolderAnalysis(job: HolderAnalysisJob) {
 }
 
 export async function enqueueRiskAnalysis(job: RiskAnalysisJob) {
+  const timeWindow = Math.floor(Date.now() / 60000);
   return riskAnalysisQueue.add("risk-check", job, {
-    jobId: `risk:${job.tokenId}`,
+    jobId: `risk:${job.tokenId}:${timeWindow}`,
   });
 }
 

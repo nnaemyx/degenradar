@@ -16,16 +16,32 @@ export const tokenDiscoveryWorker = new Worker<TokenDiscoveryJob>(
     const { mintAddress, detectedAt, source } = job.data;
     log.info({ mintAddress, source }, "Processing discovered token");
 
-    // 1. Idempotency check: see if token exists in DB
+    // 1. Check if token already exists in DB
     const existing = await db
-      .select({ id: tokens.id })
+      .select({ id: tokens.id, symbol: tokens.symbol, name: tokens.name })
       .from(tokens)
       .where(eq(tokens.mintAddress, mintAddress))
       .limit(1);
 
     if (existing.length > 0) {
-      log.debug({ mintAddress }, "Token already exists in DB. Skipping discovery creation.");
-      return { tokenId: existing[0].id, skipped: true };
+      log.info(
+        { mintAddress, symbol: existing[0].symbol, tokenId: existing[0].id },
+        "Existing stored token re-analyzed for live momentum & performance"
+      );
+
+      // Refresh last seen timestamp
+      await db
+        .update(tokens)
+        .set({ lastSeenAt: new Date() })
+        .where(eq(tokens.id, existing[0].id));
+
+      // Re-trigger live safety gate and momentum recalculations
+      await enqueueRiskAnalysis({
+        tokenId: existing[0].id,
+        mintAddress,
+      });
+
+      return { tokenId: existing[0].id, reevaluated: true };
     }
 
     // 2. Fetch metadata (Pump.fun direct API -> Helius DAS -> Birdeye)

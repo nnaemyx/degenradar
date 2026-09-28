@@ -3,6 +3,9 @@ import { enqueueTokenDiscovery, publishWsEvent } from "@degenradar/redis";
 import { createLogger } from "@degenradar/logger";
 import type { TokenDiscoveredEvent } from "@degenradar/types";
 import { env } from "@degenradar/config";
+import { birdeye } from "@degenradar/birdeye";
+import { db, tokens } from "@degenradar/db";
+import { desc, eq } from "drizzle-orm";
 
 const log = createLogger("solana-live-scanner");
 
@@ -12,11 +15,13 @@ const PUMP_FUN_PROGRAM = new PublicKey("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEw
 const RAYDIUM_V4_PROGRAM = new PublicKey("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8");
 
 /**
- * 24/7 Automated Blockchain Scanner for Solana
- * Automatically captures every newly created token without any manual human input.
+ * 24/7 Automated Blockchain & Momentum Scanner for Solana
+ * 1. Automatically captures newly created tokens (Pump.fun WebSocket & Birdeye new listings).
+ * 2. Scans trending / top-performing tokens that are already established and doing well.
+ * 3. Periodically re-evaluates stored database tokens to detect sudden breakouts or momentum surges.
  */
 export function startSolanaLiveScanner() {
-  log.info("Starting 24/7 Automated Solana Mainnet Token Scanner...");
+  log.info("Starting 24/7 Automated Solana Scanner (New Launches + Trending Performers + DB Momentum)...");
 
   // 1. Listen live to Pump.fun token creations via Helius WebSocket
   try {
@@ -42,7 +47,7 @@ export function startSolanaLiveScanner() {
           if (newMint) {
             log.info({ mint: newMint, signature: logInfo.signature }, "⚡ AUTOMATICALLY DISCOVERED NEW PUMP.FUN TOKEN!");
             
-            // 1. Instant real-time broadcast to dashboard in <100ms
+            // Instant real-time broadcast to dashboard in <100ms
             await publishWsEvent<TokenDiscoveredEvent>({
               type: "TOKEN_DISCOVERED",
               timestamp: new Date().toISOString(),
@@ -55,7 +60,7 @@ export function startSolanaLiveScanner() {
               },
             });
 
-            // 2. Queue for full enrichment, risk checks & scoring
+            // Queue for full enrichment, risk checks & scoring
             await enqueueTokenDiscovery({
               mintAddress: newMint,
               detectedAt: new Date().toISOString(),
@@ -101,6 +106,78 @@ export function startSolanaLiveScanner() {
     }
   }
 
-  // Poll every 15 seconds as a redundancy safety net
+  // 3. Trending & High-Performing Solana Tokens Poller (Birdeye)
+  async function pollTrendingTokens() {
+    try {
+      if (!env.BIRDEYE_API_KEY) return;
+      const trending = await birdeye.getTrendingTokens(20);
+      if (!trending || trending.length === 0) return;
+
+      log.info({ count: trending.length }, "Scanned live trending & top-performing Solana tokens");
+
+      for (const t of trending) {
+        if (!t.address) continue;
+
+        // Instant UI broadcast so dashboard shows real symbol & price immediately
+        await publishWsEvent<TokenDiscoveredEvent>({
+          type: "TOKEN_DISCOVERED",
+          timestamp: new Date().toISOString(),
+          data: {
+            mintAddress: t.address,
+            symbol: t.symbol || "TRENDING",
+            name: t.name || "Trending Token",
+            creatorAddress: null,
+            firstSeenAt: new Date().toISOString(),
+          },
+        });
+
+        // Queue for risk assessment & live scoring
+        await enqueueTokenDiscovery({
+          mintAddress: t.address,
+          detectedAt: new Date().toISOString(),
+          source: "birdeye_trending",
+        });
+      }
+    } catch (e) {
+      log.debug({ err: (e as Error).message }, "Trending poller iteration notice");
+    }
+  }
+
+  // 4. Stored Tokens Momentum Monitor (Continually re-evaluates database tokens)
+  async function pollStoredTokensForMomentum() {
+    try {
+      const stored = await db
+        .select({ id: tokens.id, mintAddress: tokens.mintAddress, symbol: tokens.symbol })
+        .from(tokens)
+        .where(eq(tokens.isActive, true))
+        .orderBy(desc(tokens.lastSeenAt))
+        .limit(25);
+
+      if (stored.length === 0) return;
+
+      log.debug({ count: stored.length }, "Re-checking stored tokens for breakout momentum");
+
+      for (const token of stored) {
+        await enqueueTokenDiscovery({
+          mintAddress: token.mintAddress,
+          detectedAt: new Date().toISOString(),
+          source: "db_momentum_recheck",
+        });
+      }
+    } catch (e) {
+      log.debug({ err: (e as Error).message }, "DB momentum monitor notice");
+    }
+  }
+
+  // Run initial polls immediately on startup
+  pollNewListings();
+  pollTrendingTokens();
+
+  // Polling intervals:
+  // - Newly listed: every 15s
+  // - Trending / top performers: every 45s
+  // - Stored tokens momentum check: every 60s
   setInterval(pollNewListings, 15000);
+  setInterval(pollTrendingTokens, 45000);
+  setInterval(pollStoredTokensForMomentum, 60000);
 }

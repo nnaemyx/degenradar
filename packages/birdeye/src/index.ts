@@ -46,6 +46,21 @@ export interface BirdeyeHolder {
   pct: number;
 }
 
+export interface BirdeyeTrendingToken {
+  address: string;
+  decimals: number;
+  symbol: string;
+  name: string;
+  price: number;
+  liquidity: number;
+  marketcap: number;
+  fdv: number;
+  rank: number;
+  volume24hUSD: number;
+  volume24hChangePercent: number;
+  price24hChangePercent: number;
+}
+
 export class BirdeyeClient {
   private http: AxiosInstance;
 
@@ -110,6 +125,29 @@ export class BirdeyeClient {
       return [];
     } catch (error) {
       log.debug({ mintAddress, error: (error as Error).message }, "Birdeye getTokenHolders request failed");
+      return [];
+    }
+  }
+
+  /**
+   * Get trending Solana tokens (tokens that are actively performing / doing well)
+   */
+  async getTrendingTokens(limit = 20): Promise<BirdeyeTrendingToken[]> {
+    try {
+      const response = await this.http.get("/defi/token_trending", {
+        params: {
+          sort_by: "rank",
+          sort_type: "asc",
+          offset: 0,
+          limit,
+        },
+      });
+      if (response.data?.success && response.data?.data?.tokens) {
+        return response.data.data.tokens as BirdeyeTrendingToken[];
+      }
+      return [];
+    } catch (error) {
+      log.debug({ error: (error as Error).message }, "Birdeye getTrendingTokens request failed");
       return [];
     }
   }
