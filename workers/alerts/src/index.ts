@@ -1,5 +1,5 @@
 import { Worker } from "bullmq";
-import { redis, publishWsEvent } from "@degenradar/redis";
+import { redis, defaultWorkerOptions, publishWsEvent } from "@degenradar/redis";
 import { db, tokens, alerts, tokenSnapshots } from "@degenradar/db";
 import { env } from "@degenradar/config";
 import { createLogger } from "@degenradar/logger";
@@ -156,7 +156,7 @@ ${signals.map((s) => `• ${s}`).join("\n")}
     return { tokenId, telegramSent };
   },
   {
-    connection: redis,
+    ...defaultWorkerOptions,
     concurrency: 5,
   }
 );

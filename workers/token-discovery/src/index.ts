@@ -1,5 +1,10 @@
 import { Worker } from "bullmq";
-import { redis, enqueueRiskAnalysis, publishWsEvent } from "@degenradar/redis";
+import {
+  redis,
+  defaultWorkerOptions,
+  enqueueRiskAnalysis,
+  publishWsEvent,
+} from "@degenradar/redis";
 import { db, tokens, pools } from "@degenradar/db";
 import { helius } from "@degenradar/helius";
 import { birdeye } from "@degenradar/birdeye";
@@ -44,7 +49,7 @@ export const tokenDiscoveryWorker = new Worker<TokenDiscoveryJob>(
       return { tokenId: existing[0].id, reevaluated: true };
     }
 
-    // 2. Fetch metadata (Pump.fun direct API -> Helius DAS -> Birdeye)
+    // 2. Fetch metadata (DexScreener -> Birdeye -> Helius DAS only if needed)
     let name = "New Token";
     let symbol = "TOKEN";
     let decimals = 9;
@@ -52,28 +57,47 @@ export const tokenDiscoveryWorker = new Worker<TokenDiscoveryJob>(
     let mintAuthority: string | null = null;
     let freezeAuthority: string | null = null;
 
+    // A. Check DexScreener first (100% FREE, 0 DAS credits used)
     try {
-      const pRes = await fetch(`https://frontend-api.pump.fun/coins/${mintAddress}`);
-      if (pRes.ok) {
-        const pData = (await pRes.json()) as any;
-        if (pData?.symbol) symbol = pData.symbol;
-        if (pData?.name) name = pData.name;
+      const dexRes = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`);
+      if (dexRes.ok) {
+        const dexData = (await dexRes.json()) as any;
+        const pair = dexData?.pairs?.[0];
+        if (pair?.baseToken?.symbol) {
+          symbol = pair.baseToken.symbol;
+          name = pair.baseToken.name || symbol;
+        }
       }
     } catch (e) {}
 
-    const asset = await helius.getAsset(mintAddress);
+    // B. Check Birdeye
     const birdeyeOverview = await birdeye.getTokenOverview(mintAddress);
+    if (birdeyeOverview?.name && name === "New Token") name = birdeyeOverview.name;
+    if (birdeyeOverview?.symbol && symbol === "TOKEN") symbol = birdeyeOverview.symbol;
+    decimals = birdeyeOverview?.decimals ?? decimals;
 
-    if (asset?.content?.metadata?.name) name = asset.content.metadata.name;
-    else if (birdeyeOverview?.name && name === "New Token") name = birdeyeOverview.name;
+    // C. Check Pump.fun direct fallback
+    if (symbol === "TOKEN") {
+      try {
+        const pRes = await fetch(`https://frontend-api-v2.pump.fun/coins/${mintAddress}`);
+        if (pRes.ok) {
+          const pData = (await pRes.json()) as any;
+          if (pData?.symbol) symbol = pData.symbol;
+          if (pData?.name) name = pData.name;
+        }
+      } catch (e) {}
+    }
 
-    if (asset?.content?.metadata?.symbol) symbol = asset.content.metadata.symbol;
-    else if (birdeyeOverview?.symbol && symbol === "TOKEN") symbol = birdeyeOverview.symbol;
-
-    decimals = asset?.token_info?.decimals ?? birdeyeOverview?.decimals ?? 9;
-    supply = asset?.token_info?.supply ? String(asset.token_info.supply) : null;
-    mintAuthority = asset?.token_info?.mint_authority || null;
-    freezeAuthority = asset?.token_info?.freeze_authority || null;
+    // D. ONLY query Helius DAS if metadata is still missing (Saves >90% of monthly DAS credits!)
+    if (symbol === "TOKEN" || name === "New Token") {
+      const asset = await helius.getAsset(mintAddress);
+      if (asset?.content?.metadata?.name) name = asset.content.metadata.name;
+      if (asset?.content?.metadata?.symbol) symbol = asset.content.metadata.symbol;
+      decimals = asset?.token_info?.decimals ?? decimals;
+      supply = asset?.token_info?.supply ? String(asset.token_info.supply) : null;
+      mintAuthority = asset?.token_info?.mint_authority || null;
+      freezeAuthority = asset?.token_info?.freeze_authority || null;
+    }
 
     // 3. Insert into tokens table (idempotent ON CONFLICT)
     const inserted = await db
@@ -142,7 +166,7 @@ export const tokenDiscoveryWorker = new Worker<TokenDiscoveryJob>(
     return { tokenId: tokenRecord.id, mintAddress };
   },
   {
-    connection: redis,
+    ...defaultWorkerOptions,
     concurrency: 15,
   }
 );

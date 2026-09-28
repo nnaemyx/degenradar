@@ -1,5 +1,5 @@
 import { Worker } from "bullmq";
-import { redis, enqueueScoreCalculation } from "@degenradar/redis";
+import { redis, defaultWorkerOptions, enqueueScoreCalculation } from "@degenradar/redis";
 import { db, tokens, tokenSnapshots, tokenFeatures, trades } from "@degenradar/db";
 import { birdeye } from "@degenradar/birdeye";
 import {
@@ -114,7 +114,7 @@ export const featureWorker = new Worker<FeatureCalculationJob>(
     return { tokenId };
   },
   {
-    connection: redis,
+    ...defaultWorkerOptions,
     concurrency: 15,
   }
 );

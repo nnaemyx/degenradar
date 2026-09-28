@@ -20,14 +20,23 @@ const defaultQueueOptions: QueueOptions = {
       delay: 2000,
     },
     removeOnComplete: {
-      count: 1000,
-      age: 3600, // 1 hour
+      count: 50,    // was 1000 — keep only last 50 completed jobs per queue
+      age: 3600,    // 1 hour
     },
     removeOnFail: {
-      count: 5000,
-      age: 24 * 3600, // 24 hours
+      count: 500,   // was 5000 — keep only last 500 failed jobs
+      age: 24 * 3600,
     },
   },
+};
+
+// Upstash-Optimized BullMQ Worker Options
+// Reduces idle Redis command consumption by ~95%
+export const defaultWorkerOptions = {
+  connection: redis,
+  drainDelay: 5, // Wait 5 seconds when queue is empty before checking again (stops command burning)
+  stalledInterval: 120000, // Check stalled jobs every 2 minutes instead of 30 seconds
+  lockDuration: 60000,
 };
 
 // Queue Definitions

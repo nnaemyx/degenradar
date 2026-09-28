@@ -154,7 +154,7 @@ export function startSolanaLiveScanner() {
         .from(tokens)
         .where(eq(tokens.isActive, true))
         .orderBy(desc(tokens.lastSeenAt))
-        .limit(25);
+        .limit(10); // was 25 — fewer re-queues = fewer Redis commands
 
       if (stored.length === 0) return;
 
@@ -176,11 +176,11 @@ export function startSolanaLiveScanner() {
   pollNewListings();
   pollTrendingTokens();
 
-  // Polling intervals:
-  // - Newly listed: every 15s
-  // - Trending / top performers: every 45s
-  // - Stored tokens momentum check: every 60s
-  setInterval(pollNewListings, 15000);
-  setInterval(pollTrendingTokens, 45000);
-  setInterval(pollStoredTokensForMomentum, 60000);
+  // Polling intervals (reduced to save Upstash Redis free-tier commands):
+  // - Newly listed: every 30s  (was 15s)
+  // - Trending / top performers: every 2 min  (was 45s)
+  // - Stored tokens momentum check: every 3 min  (was 60s)
+  setInterval(pollNewListings, 30000);
+  setInterval(pollTrendingTokens, 120000);
+  setInterval(pollStoredTokensForMomentum, 180000);
 }

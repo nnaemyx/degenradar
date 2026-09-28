@@ -1,6 +1,7 @@
 import { Worker } from "bullmq";
 import {
   redis,
+  defaultWorkerOptions,
   enqueueAlertProcessing,
   enqueueOutcomeCalculation,
   publishWsEvent,
@@ -169,7 +170,7 @@ export const scoringWorker = new Worker<ScoreCalculationJob>(
     return { scoreId: scoreRecord.id, opportunityScore: result.opportunityScore };
   },
   {
-    connection: redis,
+    ...defaultWorkerOptions,
     concurrency: 20,
   }
 );

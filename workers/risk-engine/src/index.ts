@@ -1,5 +1,10 @@
 import { Worker } from "bullmq";
-import { redis, enqueueFeatureCalculation, publishWsEvent } from "@degenradar/redis";
+import {
+  redis,
+  defaultWorkerOptions,
+  enqueueFeatureCalculation,
+  publishWsEvent,
+} from "@degenradar/redis";
 import { db, tokens, riskAssessments, pools } from "@degenradar/db";
 import { jupiter } from "@degenradar/jupiter";
 import { birdeye } from "@degenradar/birdeye";
@@ -90,7 +95,7 @@ export const riskWorker = new Worker<RiskAnalysisJob>(
     return { assessmentId: assessment.id, overallRisk };
   },
   {
-    connection: redis,
+    ...defaultWorkerOptions,
     concurrency: 10,
   }
 );
