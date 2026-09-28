@@ -11,6 +11,8 @@ export interface LiveTokenItem {
   riskScore: number;
   firstSeenAt: string;
   isNew?: boolean;
+  volume24h?: number;
+  priceChange24h?: number;
 }
 
 export interface LiveAlertItem {
@@ -37,6 +39,7 @@ interface DegenState {
     marketCap?: number | null,
     liquidityUsd?: number | null
   ) => void;
+  enrichToken: (mint: string, data: Partial<LiveTokenItem>) => void;
   addDiscoveredToken: (item: Partial<LiveTokenItem> & { mintAddress: string }) => void;
   addAlert: (alert: LiveAlertItem) => void;
 }
@@ -68,6 +71,24 @@ export const useDegenStore = create<DegenState>((set) => ({
           priceUsd: (priceUsd !== undefined && priceUsd !== null && priceUsd > 0) ? priceUsd : current.priceUsd,
           marketCap: (marketCap !== undefined && marketCap !== null && marketCap > 0) ? marketCap : current.marketCap,
           liquidityUsd: (liquidityUsd !== undefined && liquidityUsd !== null && liquidityUsd > 0) ? liquidityUsd : current.liquidityUsd,
+        });
+      }
+      return { tokens: next };
+    }),
+
+  enrichToken: (mint, data) =>
+    set((state) => {
+      const next = new Map(state.tokens);
+      const current = next.get(mint);
+      if (current) {
+        next.set(mint, {
+          ...current,
+          ...data,
+          symbol: data.symbol && data.symbol !== "TOKEN" && data.symbol !== "SCANNING" ? data.symbol : current.symbol,
+          name: data.name && data.name !== "New Token" && data.name !== "New Solana Launch" ? data.name : current.name,
+          priceUsd: data.priceUsd && data.priceUsd > 0 ? data.priceUsd : current.priceUsd,
+          marketCap: data.marketCap && data.marketCap > 0 ? data.marketCap : current.marketCap,
+          liquidityUsd: data.liquidityUsd && data.liquidityUsd > 0 ? data.liquidityUsd : current.liquidityUsd,
         });
       }
       return { tokens: next };

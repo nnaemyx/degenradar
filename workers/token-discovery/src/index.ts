@@ -5,7 +5,7 @@ import {
   enqueueRiskAnalysis,
   publishWsEvent,
 } from "@degenradar/redis";
-import { db, tokens, pools } from "@degenradar/db";
+import { db, tokens, pools, tokenSnapshots } from "@degenradar/db";
 import { helius } from "@degenradar/helius";
 import { birdeye } from "@degenradar/birdeye";
 import { createLogger } from "@degenradar/logger";
@@ -56,8 +56,11 @@ export const tokenDiscoveryWorker = new Worker<TokenDiscoveryJob>(
     let supply: string | null = null;
     let mintAuthority: string | null = null;
     let freezeAuthority: string | null = null;
+    let priceUsd = 0;
+    let marketCap = 0;
+    let liquidityUsd = 0;
 
-    // A. Check DexScreener first (100% FREE, 0 DAS credits used)
+    // A. Check DexScreener first (100% FREE, 0 DAS credits used - has real-time price & MC)
     try {
       const dexRes = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`);
       if (dexRes.ok) {
@@ -66,24 +69,33 @@ export const tokenDiscoveryWorker = new Worker<TokenDiscoveryJob>(
         if (pair?.baseToken?.symbol) {
           symbol = pair.baseToken.symbol;
           name = pair.baseToken.name || symbol;
+          priceUsd = Number(pair.priceUsd) || 0;
+          marketCap = Number(pair.marketCap || pair.fdv) || 0;
+          liquidityUsd = Number(pair.liquidity?.usd) || 0;
         }
       }
     } catch (e) {}
 
     // B. Check Birdeye
     const birdeyeOverview = await birdeye.getTokenOverview(mintAddress);
-    if (birdeyeOverview?.name && name === "New Token") name = birdeyeOverview.name;
-    if (birdeyeOverview?.symbol && symbol === "TOKEN") symbol = birdeyeOverview.symbol;
-    decimals = birdeyeOverview?.decimals ?? decimals;
+    if (birdeyeOverview) {
+      if (birdeyeOverview.name && name === "New Token") name = birdeyeOverview.name;
+      if (birdeyeOverview.symbol && symbol === "TOKEN") symbol = birdeyeOverview.symbol;
+      decimals = birdeyeOverview.decimals ?? decimals;
+      if (priceUsd === 0 && birdeyeOverview.price) priceUsd = birdeyeOverview.price;
+      if (marketCap === 0 && birdeyeOverview.mc) marketCap = birdeyeOverview.mc;
+      if (liquidityUsd === 0 && birdeyeOverview.liquidity) liquidityUsd = birdeyeOverview.liquidity;
+    }
 
     // C. Check Pump.fun direct fallback
-    if (symbol === "TOKEN") {
+    if (symbol === "TOKEN" || marketCap === 0) {
       try {
         const pRes = await fetch(`https://frontend-api-v2.pump.fun/coins/${mintAddress}`);
         if (pRes.ok) {
           const pData = (await pRes.json()) as any;
           if (pData?.symbol) symbol = pData.symbol;
           if (pData?.name) name = pData.name;
+          if (marketCap === 0 && pData?.usd_market_cap) marketCap = Number(pData.usd_market_cap) || 0;
         }
       } catch (e) {}
     }
@@ -125,8 +137,23 @@ export const tokenDiscoveryWorker = new Worker<TokenDiscoveryJob>(
       return;
     }
 
-    // 4. Create initial default pool record if liquidity exists
-    if (birdeyeOverview?.liquidity) {
+    // 4. Insert initial token snapshot so DB queries immediately return real market cap and price
+    if (priceUsd > 0 || marketCap > 0 || liquidityUsd > 0) {
+      await db
+        .insert(tokenSnapshots)
+        .values({
+          tokenId: tokenRecord.id,
+          priceUsd: String(priceUsd),
+          marketCap: String(marketCap),
+          liquidityUsd: String(liquidityUsd),
+          volume5m: "0",
+          volume1h: "0",
+        })
+        .catch(() => {});
+    }
+
+    // 5. Create initial default pool record if liquidity exists
+    if (liquidityUsd > 0) {
       await db
         .insert(pools)
         .values({
@@ -135,12 +162,13 @@ export const tokenDiscoveryWorker = new Worker<TokenDiscoveryJob>(
           poolAddress: `pool_${mintAddress}`,
           baseMint: mintAddress,
           quoteMint: "So11111111111111111111111111111111111111112",
-          liquidityUsd: String(birdeyeOverview.liquidity),
+          liquidityUsd: String(liquidityUsd),
         })
-        .onConflictDoNothing();
+        .onConflictDoNothing()
+        .catch(() => {});
     }
 
-    // 5. Broadcast live WebSocket event
+    // 6. Broadcast live WebSocket event with real market metrics
     await publishWsEvent<TokenDiscoveredEvent>({
       type: "TOKEN_DISCOVERED",
       timestamp: new Date().toISOString(),
@@ -150,9 +178,9 @@ export const tokenDiscoveryWorker = new Worker<TokenDiscoveryJob>(
         name: tokenRecord.name,
         creatorAddress: tokenRecord.creatorAddress,
         firstSeenAt: tokenRecord.firstSeenAt.toISOString(),
-        priceUsd: birdeyeOverview?.price || 0,
-        marketCap: birdeyeOverview?.mc || 0,
-        liquidityUsd: birdeyeOverview?.liquidity || 0,
+        priceUsd: priceUsd > 0 ? priceUsd : null,
+        marketCap: marketCap > 0 ? marketCap : null,
+        liquidityUsd: liquidityUsd > 0 ? liquidityUsd : null,
       },
     });
 
