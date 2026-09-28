@@ -184,7 +184,7 @@ export const tokenDiscoveryWorker = new Worker<TokenDiscoveryJob>(
       },
     });
 
-    // 6. Enqueue immediate risk assessment (Stage 1 Safety Gate)
+    // 7. Enqueue immediate risk assessment (Stage 1 Safety Gate)
     await enqueueRiskAnalysis({
       tokenId: tokenRecord.id,
       mintAddress: tokenRecord.mintAddress,
