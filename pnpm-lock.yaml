@@ -38,6 +38,21 @@ importers:
       '@degenradar/types':
         specifier: workspace:*
         version: link:../../packages/types
+      '@degenradar/worker-alerts':
+        specifier: workspace:*
+        version: link:../../workers/alerts
+      '@degenradar/worker-feature-engine':
+        specifier: workspace:*
+        version: link:../../workers/feature-engine
+      '@degenradar/worker-risk-engine':
+        specifier: workspace:*
+        version: link:../../workers/risk-engine
+      '@degenradar/worker-scoring':
+        specifier: workspace:*
+        version: link:../../workers/scoring
+      '@degenradar/worker-token-discovery':
+        specifier: workspace:*
+        version: link:../../workers/token-discovery
       '@fastify/cors':
         specifier: ^10.0.1
         version: 10.1.0

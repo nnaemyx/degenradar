@@ -69,6 +69,17 @@ async function main() {
   try {
     await app.listen({ port: env.API_PORT, host: env.API_HOST });
     logger.info(`DegenRadar API & WebSocket Gateway running at http://${env.API_HOST}:${env.API_PORT}`);
+
+    // Launch all 24/7 background scanners & workers inside the API service (runs on Render Free Web Service)
+    if (process.env.RUN_WORKERS !== "false") {
+      logger.info("Initializing 24/7 Background Workers & Live Blockchain Scanners in API process...");
+      await import("@degenradar/worker-token-discovery");
+      await import("@degenradar/worker-risk-engine");
+      await import("@degenradar/worker-feature-engine");
+      await import("@degenradar/worker-scoring");
+      await import("@degenradar/worker-alerts");
+      logger.info("All 5 background workers running 24/7 alongside Fastify API Gateway");
+    }
   } catch (err) {
     logger.error({ err }, "Error starting Fastify server");
     process.exit(1);

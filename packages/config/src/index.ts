@@ -34,6 +34,7 @@ export type Config = z.infer<typeof configSchema>;
 
 export const env = configSchema.parse({
   ...process.env,
+  API_PORT: process.env.PORT || process.env.API_PORT || 3001,
   HELIUS_RPC_URL: process.env.HELIUS_RPC_URL || (process.env.HELIUS_API_KEY ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}` : undefined),
   HELIUS_WS_URL: process.env.HELIUS_WS_URL || (process.env.HELIUS_API_KEY ? `wss://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}` : undefined),
 });
