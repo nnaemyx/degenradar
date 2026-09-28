@@ -8,6 +8,7 @@
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
     "clean": "turbo run clean",
+    "start:workers": "turbo run start --filter=\"@degenradar/worker-*\"",
     "db:generate": "pnpm --filter @degenradar/db generate",
     "db:migrate": "pnpm --filter @degenradar/db migrate",
     "db:studio": "pnpm --filter @degenradar/db studio"
