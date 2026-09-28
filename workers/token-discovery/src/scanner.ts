@@ -246,21 +246,82 @@ export function startSolanaLiveScanner() {
     }
   }
 
+  // 7. Solana Viral Meme Callouts & Boosts Poller (The exact tokens being shilled and called out on Solana & Pump.fun)
+  async function pollSolanaViralCallouts() {
+    try {
+      const [topRes, latestRes] = await Promise.allSettled([
+        fetch("https://api.dexscreener.com/token-boosts/top/v1"),
+        fetch("https://api.dexscreener.com/token-boosts/latest/v1"),
+      ]);
+
+      const items: any[] = [];
+      if (topRes.status === "fulfilled" && topRes.value.ok) {
+        const topData = (await topRes.value.json()) as any[];
+        if (Array.isArray(topData)) items.push(...topData);
+      }
+      if (latestRes.status === "fulfilled" && latestRes.value.ok) {
+        const latestData = (await latestRes.value.json()) as any[];
+        if (Array.isArray(latestData)) items.push(...latestData);
+      }
+
+      // Filter for Solana network tokens (includes all viral Pump.fun & Raydium callouts)
+      const solanaCallouts = items.filter(
+        (i) => i.chainId === "solana" && i.tokenAddress
+      );
+
+      const uniqueMints = Array.from(
+        new Set(solanaCallouts.map((i) => i.tokenAddress as string))
+      ).slice(0, 15);
+
+      if (uniqueMints.length > 0) {
+        log.info({ count: uniqueMints.length }, "🔥 Scanned live Solana viral meme callouts & boosts");
+
+        for (const mint of uniqueMints) {
+          await publishWsEvent<TokenDiscoveredEvent>({
+            type: "TOKEN_DISCOVERED",
+            timestamp: new Date().toISOString(),
+            data: {
+              mintAddress: mint,
+              symbol: mint.endsWith("pump") ? "PUMP" : "CALLOUT",
+              name: "Viral Solana Callout",
+              creatorAddress: null,
+              firstSeenAt: new Date().toISOString(),
+              priceUsd: 0,
+              marketCap: 0,
+              liquidityUsd: 0,
+            },
+          });
+
+          await enqueueTokenDiscovery({
+            mintAddress: mint,
+            detectedAt: new Date().toISOString(),
+            source: "dexscreener_callout",
+          });
+        }
+      }
+    } catch (e) {
+      log.debug({ err: (e as Error).message }, "Solana viral callouts poller notice");
+    }
+  }
+
   // Run initial polls immediately on startup
   pollNewListings();
   pollTrendingTokens();
   pollTopGainers();
   pollTopPriceMovers();
+  pollSolanaViralCallouts();
 
-  // Polling intervals (reduced to save Upstash Redis free-tier commands):
-  // - Newly listed: every 30s  (was 15s)
-  // - Trending / top performers: every 2 min  (was 45s)
+  // Polling intervals:
+  // - Newly listed: every 30s
+  // - Trending / top performers: every 2 min
   // - Top gainers by volume: every 3 min
   // - Top price movers (24h %): every 5 min
-  // - Stored tokens momentum check: every 3 min  (was 60s)
+  // - Viral Solana meme callouts & boosts: every 90s
+  // - Stored tokens momentum check: every 3 min
   setInterval(pollNewListings, 30000);
   setInterval(pollTrendingTokens, 120000);
   setInterval(pollTopGainers, 180000);
   setInterval(pollTopPriceMovers, 300000);
+  setInterval(pollSolanaViralCallouts, 90000);
   setInterval(pollStoredTokensForMomentum, 180000);
 }

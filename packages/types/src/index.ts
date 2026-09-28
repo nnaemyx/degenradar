@@ -275,7 +275,7 @@ export interface TokenOutcome {
 export interface TokenDiscoveryJob {
   mintAddress: string;
   detectedAt: string;
-  source: "helius_ws" | "birdeye_new" | "birdeye_trending" | "birdeye_top_gainers" | "birdeye_price_mover" | "db_momentum_recheck" | "manual";
+  source: "helius_ws" | "birdeye_new" | "birdeye_trending" | "birdeye_top_gainers" | "birdeye_price_mover" | "dexscreener_callout" | "pumpfun_callout" | "db_momentum_recheck" | "manual";
 }
 
 export interface TradeProcessingJob {

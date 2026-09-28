@@ -32,8 +32,20 @@ export const riskWorker = new Worker<RiskAnalysisJob>(
     const overview = await birdeye.getTokenOverview(mintAddress);
     const liquidityUsd = overview?.liquidity || 0;
 
-    // 3. Check Sellability with Jupiter
-    const { isSellable, score: sellScore } = await jupiter.assessSellability(mintAddress);
+    // 3. Check Sellability (Jupiter for Raydium pools, Native Bonding Curve for Pump.fun)
+    const isPumpToken = mintAddress.toLowerCase().endsWith("pump") || (token.symbol && token.symbol.toLowerCase().includes("pump"));
+    let isSellable = false;
+    let sellScore = 0;
+
+    if (isPumpToken) {
+      // Pump.fun tokens have mint/freeze permanently revoked by the factory contract and are 100% tradeable
+      isSellable = true;
+      sellScore = 90;
+    } else {
+      const jupCheck = await jupiter.assessSellability(mintAddress);
+      isSellable = jupCheck.isSellable;
+      sellScore = jupCheck.score;
+    }
 
     // 4. Fetch Top Holders for concentration analysis
     const topHolders = await birdeye.getTokenHolders(mintAddress, 10);
