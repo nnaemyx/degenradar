@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schema.railway.app/railway.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "../../Dockerfile",
+    "dockerBuildTarget": "worker-feature-engine"
+  },
+  "deploy": {
+    "startCommand": "pnpm --filter @degenradar/worker-feature-engine start",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}
