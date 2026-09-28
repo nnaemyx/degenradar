@@ -28,16 +28,36 @@ export const tokenDiscoveryWorker = new Worker<TokenDiscoveryJob>(
       return { tokenId: existing[0].id, skipped: true };
     }
 
-    // 2. Fetch metadata from Helius DAS
+    // 2. Fetch metadata (Pump.fun direct API -> Helius DAS -> Birdeye)
+    let name = "New Token";
+    let symbol = "TOKEN";
+    let decimals = 9;
+    let supply: string | null = null;
+    let mintAuthority: string | null = null;
+    let freezeAuthority: string | null = null;
+
+    try {
+      const pRes = await fetch(`https://frontend-api.pump.fun/coins/${mintAddress}`);
+      if (pRes.ok) {
+        const pData = (await pRes.json()) as any;
+        if (pData?.symbol) symbol = pData.symbol;
+        if (pData?.name) name = pData.name;
+      }
+    } catch (e) {}
+
     const asset = await helius.getAsset(mintAddress);
     const birdeyeOverview = await birdeye.getTokenOverview(mintAddress);
 
-    const name = asset?.content?.metadata?.name || birdeyeOverview?.name || "Unknown Token";
-    const symbol = asset?.content?.metadata?.symbol || birdeyeOverview?.symbol || "TOKEN";
-    const decimals = asset?.token_info?.decimals ?? birdeyeOverview?.decimals ?? 9;
-    const supply = asset?.token_info?.supply ? String(asset.token_info.supply) : null;
-    const mintAuthority = asset?.token_info?.mint_authority || null;
-    const freezeAuthority = asset?.token_info?.freeze_authority || null;
+    if (asset?.content?.metadata?.name) name = asset.content.metadata.name;
+    else if (birdeyeOverview?.name && name === "New Token") name = birdeyeOverview.name;
+
+    if (asset?.content?.metadata?.symbol) symbol = asset.content.metadata.symbol;
+    else if (birdeyeOverview?.symbol && symbol === "TOKEN") symbol = birdeyeOverview.symbol;
+
+    decimals = asset?.token_info?.decimals ?? birdeyeOverview?.decimals ?? 9;
+    supply = asset?.token_info?.supply ? String(asset.token_info.supply) : null;
+    mintAuthority = asset?.token_info?.mint_authority || null;
+    freezeAuthority = asset?.token_info?.freeze_authority || null;
 
     // 3. Insert into tokens table (idempotent ON CONFLICT)
     const inserted = await db

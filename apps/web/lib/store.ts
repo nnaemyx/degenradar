@@ -28,7 +28,7 @@ interface DegenState {
   alerts: LiveAlertItem[];
   isConnected: boolean;
   setConnected: (status: boolean) => void;
-  updateTokenScore: (mint: string, opportunity: number, risk: number) => void;
+  updateTokenScore: (mint: string, opportunity: number, risk: number, symbol?: string | null) => void;
   addDiscoveredToken: (item: Partial<LiveTokenItem> & { mintAddress: string }) => void;
   addAlert: (alert: LiveAlertItem) => void;
 }
@@ -39,13 +39,14 @@ export const useDegenStore = create<DegenState>((set) => ({
   isConnected: false,
   setConnected: (status) => set({ isConnected: status }),
 
-  updateTokenScore: (mint, opportunity, risk) =>
+  updateTokenScore: (mint: string, opportunity: number, risk: number, symbol?: string | null) =>
     set((state) => {
       const next = new Map(state.tokens);
       const current = next.get(mint);
       if (current) {
         next.set(mint, {
           ...current,
+          symbol: (symbol && symbol !== "SCANNING" && symbol !== "UNKNOWN") ? symbol : current.symbol,
           opportunityScore: opportunity,
           riskScore: risk,
         });
@@ -56,16 +57,27 @@ export const useDegenStore = create<DegenState>((set) => ({
   addDiscoveredToken: (item) =>
     set((state) => {
       const next = new Map(state.tokens);
+      const existing = next.get(item.mintAddress);
+      const realSymbol = item.symbol && item.symbol !== "SCANNING" && item.symbol !== "UNKNOWN"
+        ? item.symbol
+        : existing?.symbol && existing.symbol !== "SCANNING" && existing.symbol !== "UNKNOWN"
+          ? existing.symbol
+          : (item.symbol || "TOKEN");
+
+      const realName = item.name && item.name !== "New Solana Launch"
+        ? item.name
+        : existing?.name || item.name || "Token";
+
       next.set(item.mintAddress, {
         mintAddress: item.mintAddress,
-        symbol: item.symbol || "UNKNOWN",
-        name: item.name || "Token",
-        priceUsd: item.priceUsd || 0,
-        marketCap: item.marketCap || 0,
-        liquidityUsd: item.liquidityUsd || 0,
-        opportunityScore: item.opportunityScore || 50,
-        riskScore: item.riskScore || 20,
-        firstSeenAt: item.firstSeenAt || new Date().toISOString(),
+        symbol: realSymbol,
+        name: realName,
+        priceUsd: item.priceUsd ?? existing?.priceUsd ?? 0,
+        marketCap: item.marketCap ?? existing?.marketCap ?? 0,
+        liquidityUsd: item.liquidityUsd ?? existing?.liquidityUsd ?? 0,
+        opportunityScore: item.opportunityScore ?? existing?.opportunityScore ?? 50,
+        riskScore: item.riskScore ?? existing?.riskScore ?? 20,
+        firstSeenAt: item.firstSeenAt || existing?.firstSeenAt || new Date().toISOString(),
         isNew: true,
       });
       return { tokens: next };

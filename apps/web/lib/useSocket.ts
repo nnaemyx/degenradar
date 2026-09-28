@@ -38,7 +38,8 @@ export function useDegenSocket() {
                 updateTokenScore(
                   payload.data.mintAddress,
                   payload.data.opportunityScore,
-                  payload.data.riskScore
+                  payload.data.riskScore,
+                  payload.data.symbol
                 );
                 break;
 
